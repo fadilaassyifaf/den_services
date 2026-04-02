@@ -1,0 +1,209 @@
+export interface LogEntry {
+  timestamp: string;
+  message: string;
+  level: 'info' | 'success' | 'warning' | 'error';
+}
+
+export interface TaskStatus {
+  task_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  logs?: LogEntry[];
+  current_step?: string;
+  message?: string;
+  result?: { download_url?: string; output_file?: string };
+}
+
+export interface TaskSubmitResponse {
+  task_id: string;
+  task_status_url: string;
+}
+
+function extractErrorMessage(error: unknown, fallback = 'Unknown error'): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, unknown>;
+    if (typeof e.message === 'string') return e.message;
+    if (typeof e.detail === 'string') return e.detail;
+    if (typeof e.error === 'string') return e.error;
+    try { return JSON.stringify(error); } catch { return fallback; }
+  }
+  return fallback;
+}
+
+export class BoqIntersiteTask {
+  private API_BASE_URL = '/api/iris';
+  private POLL_INTERVAL = 3000;
+  private currentTaskId: string | null = null;
+  private pollingInterval: ReturnType<typeof setInterval> | null = null;
+  private abortController: AbortController | null = null;
+
+  
+  async submitTask(formData: FormData): Promise<{ success: boolean; task_id?: string; error?: string }> {
+    try {
+      this.cancelPolling();
+      this.currentTaskId = null;
+      this.abortController = new AbortController();
+
+      const response = await fetch(`${this.API_BASE_URL}/boq-intersite`, {
+        method: 'POST',
+        body: formData,
+        signal: this.abortController.signal,
+      });
+
+      const rawBody = await response.text();
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const parsed = JSON.parse(rawBody);
+          errorMessage = parsed.detail || parsed.error || parsed.message || rawBody;
+        } catch { errorMessage = rawBody; }
+        throw new Error(errorMessage);
+      }
+
+      const data: TaskSubmitResponse = JSON.parse(rawBody);
+      if (!data.task_id) throw new Error('No task_id received');
+
+      this.currentTaskId = data.task_id;
+      this.startPolling();
+      return { success: true, task_id: data.task_id };
+    } catch (error) {
+      this.cancelPolling();
+      this.currentTaskId = null;
+      if (error instanceof Error && error.name === 'AbortError') return { success: false, error: 'Request cancelled' };
+      return { success: false, error: extractErrorMessage(error) };
+    }
+  }
+
+  private startPolling() {
+    if (this.pollingInterval) { clearInterval(this.pollingInterval); this.pollingInterval = null; }
+    if (!this.currentTaskId) return;
+    this.pollTaskStatus();
+    this.pollingInterval = setInterval(() => this.pollTaskStatus(), this.POLL_INTERVAL);
+  }
+
+  private async pollTaskStatus() {
+    if (!this.currentTaskId) { this.cancelPolling(); return; }
+    const taskId = this.currentTaskId;
+
+    try {
+      const statusUrl = `${this.API_BASE_URL}/tasks/status/${taskId}`;
+      const response = await fetch(statusUrl, { method: 'GET', headers: { Accept: 'application/json, application/zip' } });
+      const contentType = response.headers.get('Content-Type') || '';
+
+      if (contentType.includes('application/zip')) {
+        await this.handleTaskComplete(response, statusUrl);
+        return;
+      }
+
+      const rawBody = await response.text();
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${rawBody}`);
+
+      const raw = JSON.parse(rawBody);
+
+      const statusMap: Record<string, TaskStatus['status']> = {
+        PENDING: 'pending', PROGRESS: 'processing', SUCCESS: 'completed', FAILURE: 'failed',
+        pending: 'pending', processing: 'processing', completed: 'completed', failed: 'failed',
+      };
+      const normalizedStatus: TaskStatus['status'] = statusMap[raw.status] ?? 'processing';
+
+      let infoMessage = '';
+      if (typeof raw.info === 'string') infoMessage = raw.info;
+      else if (raw.info && typeof raw.info === 'object') infoMessage = raw.info.status || raw.info.message || JSON.stringify(raw.info);
+
+      const progress = typeof raw.info?.progress === 'number' ? raw.info.progress :
+        normalizedStatus === 'completed' ? 100 : normalizedStatus === 'pending' ? 0 : raw.progress ?? 0;
+
+      const logLevel: LogEntry['level'] =
+        normalizedStatus === 'failed' ? 'error' :
+        normalizedStatus === 'completed' ? 'success' : 'info';
+
+      this.updateUI({
+        task_id: raw.task_id || taskId,
+        status: normalizedStatus,
+        progress,
+        logs: infoMessage ? [{ timestamp: new Date().toISOString(), message: infoMessage, level: logLevel }] : [],
+        current_step: infoMessage,
+        message: infoMessage,
+      });
+
+      if (normalizedStatus === 'completed' || normalizedStatus === 'failed') {
+        this.cancelPolling();
+        if (normalizedStatus === 'failed') this.handleError(infoMessage || 'Task failed');
+        else this.notifyTaskCompleted(statusUrl);
+      }
+    } catch (error) {
+      this.cancelPolling();
+      this.currentTaskId = null;
+      this.handleError(extractErrorMessage(error, 'Polling failed'));
+    }
+  }
+
+  private async handleTaskComplete(response: Response, downloadUrl: string) {
+    this.cancelPolling();
+    const contentDisposition = response.headers.get('Content-Disposition') || '';
+    let filename = 'boq_intersite_result.zip';
+    const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    if (match?.[1]) filename = match[1].replace(/['"]/g, '');
+
+    this.updateUI({
+      task_id: this.currentTaskId!,
+      status: 'completed', progress: 100,
+      logs: [{ timestamp: new Date().toISOString(), message: `Task completed! File: ${filename}`, level: 'success' }],
+      result: { download_url: downloadUrl, output_file: filename },
+    });
+    this.notifyTaskCompleted(downloadUrl, filename);
+  }
+
+  private notifyTaskCompleted(downloadUrl: string, filename?: string) {
+    window.dispatchEvent(new CustomEvent('taskCompleted', {
+      detail: { task_id: this.currentTaskId, download_url: downloadUrl, filename: filename || 'boq_intersite_result.zip' },
+    }));
+  }
+
+  private updateUI(data: TaskStatus) {
+    window.dispatchEvent(new CustomEvent('taskStatusUpdate', {
+      detail: {
+        task_id: data.task_id || this.currentTaskId,
+        status: data.status || 'processing',
+        progress: data.progress ?? 0,
+        logs: data.logs || [],
+        current_step: data.current_step || '',
+        message: data.message || '',
+        download_url: data.result?.download_url,
+        output_file: data.result?.output_file,
+      },
+    }));
+  }
+
+  private handleError(errorMessage: string) {
+    window.dispatchEvent(new CustomEvent('taskError', { detail: { error: errorMessage } }));
+  }
+
+  cancelPolling() {
+    if (this.pollingInterval) { clearInterval(this.pollingInterval); this.pollingInterval = null; }
+    if (this.abortController) { this.abortController.abort(); this.abortController = null; }
+  }
+
+  getCurrentTaskId() { return this.currentTaskId; }
+
+  async downloadFile(url: string, filename?: string): Promise<boolean> {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
+      const blob = await response.blob();
+      const a = document.createElement('a');
+      a.href = window.URL.createObjectURL(blob);
+      a.download = filename || 'boq_intersite_result.zip';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+      return true;
+    } catch (error) {
+      this.handleError(extractErrorMessage(error, 'Failed to download file'));
+      return false;
+    }
+  }
+}

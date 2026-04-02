@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand Colors */
+  --tbig-primary: #11499E;
+  --tbig-secondary: #1E99D5;
+  --tbig-accent: #5D87C9;
+  
+  /* System Colors */
+  --background: #ffffff;
+  --foreground: #11499E; /* Mengubah default ke biru primer agar lebih clean */
+}
+
+@theme inline {
+  --color-tbig-primary: var(--tbig-primary);
+  --color-tbig-secondary: var(--tbig-secondary);
+  --color-tbig-accent: var(--tbig-accent);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+/* Base reset */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', Arial, Helvetica, sans-serif; /* Menggunakan Inter jika tersedia untuk kesan modern */
+  overflow: hidden; /* Mencegah scrolling pada level body sesuai requirement */
+}
+
+/* --- CUSTOM SCROLLBAR SIDEBAR --- */
+/* Dibuat lebih tipis agar tidak mengganggu visual filter */
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px; 
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--tbig-accent); 
+  border-radius: 10px;
+  /* Menghapus border agar scrollbar terlihat lebih menyatu/clean */
+}
+
+.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: var(--tbig-primary);
+}
+
+/* Firefox Support */
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tbig-accent) transparent;
+}
+
+/* Utility untuk Tabel Gelap agar tidak ada bocor warna putih */
+.dark-table-container {
+  background-color: #121212;
+  scrollbar-color: #333 transparent;
+}
