@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
        WHERE user_nik = $1 
        AND created_at > NOW() - INTERVAL '${COOLDOWN_SECONDS} seconds'
        ORDER BY created_at DESC LIMIT 1`,
-      [user.nik]
+      [user.id]
     );
 
     if (recentOtp.rows.length > 0) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       `SELECT COUNT(*) FROM password_resets 
        WHERE user_nik = $1 
        AND created_at > NOW() - INTERVAL '1 hour'`,
-      [user.nik]
+      [user.id]
     );
 
     if (parseInt(hourlyRequests.rows[0].count) >= MAX_REQUESTS_PER_HOUR) {
@@ -69,11 +69,11 @@ export async function POST(request: NextRequest) {
     const expiredAt = new Date();
     expiredAt.setSeconds(expiredAt.getSeconds() + 30);
 
-    await query('DELETE FROM password_resets WHERE user_nik = $1', [user.nik]);
+    await query('DELETE FROM password_resets WHERE user_nik = $1', [user.id]);
     await query(
       `INSERT INTO password_resets (user_nik, otp_hash, expired_at, is_used, attempt_count) 
        VALUES ($1, $2, $3, FALSE, 0)`,
-      [user.nik, otpHash, expiredAt]
+      [user.id, otpHash, expiredAt]
     );
 
     // ✅ Opsi 1: Log OTP ke console jika email gagal

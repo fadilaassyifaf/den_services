@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // 4. Cari OTP yang masih valid
     const otpResult = await query(
       'SELECT id, otp_hash, expired_at FROM password_resets WHERE user_nik = $1 AND expired_at > NOW() ORDER BY created_at DESC LIMIT 1',
-      [user.nik]
+      [user.id]
     );
 
     if (otpResult.rows.length === 0) {
@@ -73,19 +73,19 @@ export async function POST(request: NextRequest) {
     // 7. Update password di database
     await query(
       'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE nik = $2',
-      [newPasswordHash, user.nik]
+      [newPasswordHash, user.id]
     );
 
     // 8. Hapus OTP dari database (sudah digunakan)
     await query(
       'DELETE FROM password_resets WHERE user_nik = $1',
-      [user.nik]
+      [user.id]
     );
 
     // 9. Opsional: Hapus semua session lama (logout dari semua device)
     await query(
       'DELETE FROM sessions WHERE user_nik = $1',
-      [user.nik]
+      [user.id]
     );
 
     // 10. Return success

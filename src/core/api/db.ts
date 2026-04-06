@@ -1,6 +1,5 @@
 // src/core/api/db.ts
-import { Pool } from 'pg';
-
+import { Pool, PoolClient } from 'pg';
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -30,15 +29,13 @@ export async function query(text: string, params?: any[]) {
   }
 }
 
-export async function getClient() {
+export async function getClient(): Promise<PoolClient> {
   const client = await pool.connect();
   const originalQuery = client.query.bind(client);
 
-  // SOLUSI: Menggunakan rest parameter (...args: any[]) untuk menghindari error spread
   client.query = async (...args: any[]) => {
     const start = Date.now();
     try {
-      // TypeScript sekarang mengizinkan spread karena tipe args didefinisikan eksplisit
       const res = await (originalQuery as any)(...args);
       const duration = Date.now() - start;
       console.log('Executed query', { duration, rows: res.rowCount });
@@ -56,6 +53,27 @@ export async function getClient() {
   };
 
   return client;
+}
+
+/**
+ * Jalankan operasi DB dalam satu atomic transaction.
+ * COMMIT otomatis jika sukses, ROLLBACK otomatis jika ada error.
+ */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export default pool;

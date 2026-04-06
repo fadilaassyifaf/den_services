@@ -4,16 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from './Logo';
 import { useLogout } from '@/shared/hooks/useAuth';
-
-interface User {
-  name: string;
-  username: string;
-  role: string;
-  nik: string;
-}
+import { AuthUser } from '@/shared/context/AuthContext';
 
 interface HeaderProps {
-  user: User;
+  user: AuthUser | null;
 }
 
 export default function Header({ user }: HeaderProps) {
@@ -85,6 +79,8 @@ export default function Header({ user }: HeaderProps) {
       ],
     },
   ];
+
+  const isAdminOrSuperuser = user?.role === 'admin' || user?.role === 'superuser';
 
   return (
     <header className="border-b border-gray-200 px-6 py-2 flex-shrink-0 bg-white">
@@ -193,14 +189,14 @@ export default function Header({ user }: HeaderProps) {
 
                 {/* User info */}
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-800">{user.name}</p>
-                  <p className="text-xs text-gray-500">@{user.username}</p>
+                  <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
+                  <p className="text-xs text-gray-500">@{user?.username}</p>
                   <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    user.role === 'admin'
+                    isAdminOrSuperuser
                       ? 'bg-purple-100 text-purple-700'
                       : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {user.role}
+                    {user?.role}
                   </span>
                 </div>
 
@@ -220,8 +216,8 @@ export default function Header({ user }: HeaderProps) {
                   Activity Log
                 </button>
 
-                {/* Access Management — admin only */}
-                {user.role === 'admin' && (
+                {/* Access Management — admin & superuser only */}
+                {isAdminOrSuperuser && (
                   <button
                     onClick={() => { setShowDropdown(false); router.push('/access-management'); }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"

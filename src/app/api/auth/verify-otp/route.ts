@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
          AND expired_at > NOW() 
          AND is_used = FALSE
        ORDER BY created_at DESC LIMIT 1`,
-      [user.nik]
+      [user.id]
     );
 
     if (otpResult.rows.length === 0) {

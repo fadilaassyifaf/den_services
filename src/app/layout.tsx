@@ -1,11 +1,11 @@
-// app/layout.tsx
+// src/app/layout.tsx
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 
 import { ProgressProvider } from "@/shared/context/progress-context";
+import { AuthProvider } from "@/shared/context/AuthContext";
 
-// 1. Inisiasi font Poppins
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
@@ -23,11 +23,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* 2. Panggil poppins.className langsung di sini */}
       <body className={`${poppins.className} antialiased bg-[#F8FAFC]`}>
-        <ProgressProvider>
-          {children}
-        </ProgressProvider>
+        <AuthProvider>        {/* ← tambahan */}
+          <ProgressProvider>
+            {children}
+          </ProgressProvider>
+        </AuthProvider>       {/* ← tambahan */}
       </body>
     </html>
   );

@@ -1,52 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken, extractUser, AuthError } from '@/core/auth/verifyToken';
+import { query } from '@/core/api/db';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth-token')?.value;
+    const payload = await verifyToken(request);
+    const user = extractUser(payload);
 
-    if (!token) {
+    // payload.id = users.id (PK), bukan NIK
+    const userId = payload.id;
+    if (!userId) {
       return NextResponse.json(
-        { error: 'Not authenticated', valid: false },
+        { valid: false, error: 'Invalid token: missing user id' },
         { status: 401 }
       );
     }
 
-    // Decode payload tanpa verify — token sudah diverify FastAPI saat login
-    // Verify expiry secara manual
-    let payload: any;
-    try {
-      const payloadBase64 = token.split('.')[1];
-      payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
-    } catch {
+    // Ambil nik, email, dan modules sekaligus
+    const result = await query(
+      `SELECT
+         u.nik,
+         u.email,
+         COALESCE(
+           json_agg(
+             json_build_object(
+               'id', mi.id,
+               'module_name', mi.module_name,
+               'module_group', mi.module_group
+             )
+           ) FILTER (WHERE mi.id IS NOT NULL),
+           '[]'
+         ) AS modules
+       FROM users u
+       LEFT JOIN module_auth ma ON u.id = ma.user_id
+       LEFT JOIN module_information mi ON ma.module_id = mi.id
+       WHERE u.id = $1
+       GROUP BY u.nik, u.email`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: 'Invalid token format', valid: false },
+        { valid: false, error: 'User not found' },
         { status: 401 }
       );
     }
 
-    // Cek expiry
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
-      return NextResponse.json(
-        { error: 'Token expired', valid: false },
-        { status: 401 }
-      );
-    }
+    const { nik, email, modules } = result.rows[0];
 
     return NextResponse.json({
       valid: true,
-      user: {
-        nik: payload.id?.toString() || '',
-        username: payload.username || payload.sub || '',
-        name: payload.fullname || payload.username || '',
-        role: payload.role || '',
-      },
+      user: { ...user, nik, email },
+      modules,
     });
 
-  } catch (error) {
-    console.error('[ValidateToken] Error:', error);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json(
+        { valid: false, error: err.message },
+        { status: err.status }
+      );
+    }
+    console.error('[ValidateToken] unexpected error:', err);
     return NextResponse.json(
-      { error: 'Internal server error', valid: false },
+      { valid: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

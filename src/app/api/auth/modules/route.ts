@@ -1,13 +1,24 @@
-// app/api/modules/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/core/api/db';
+import { verifyToken, AuthError } from '@/core/auth/verifyToken';
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await query('SELECT * FROM modules ORDER BY id ASC');
-    return NextResponse.json({ modules: result.rows }, { status: 200 });
-  } catch (error) {
-    console.error('Fetch modules error:', error);
+    await verifyToken(request);   // semua user yang login boleh lihat
+
+    const result = await query(
+      `SELECT id, module_name, module_group, description
+       FROM module_information
+       ORDER BY module_group ASC, id ASC`
+    );
+
+    return NextResponse.json({ modules: result.rows });
+
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    console.error('[GetModules]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

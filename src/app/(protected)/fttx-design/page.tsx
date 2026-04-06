@@ -111,7 +111,7 @@ export default function FTTXDesignPage() {
   ];
 
   return (
-    <ModuleGuard endpoint="/fttx-design">
+    <ModuleGuard moduleGroup="intersite">
       <div className="h-screen bg-white flex flex-col overflow-hidden antialiased">
         <Header user={user} />
 
