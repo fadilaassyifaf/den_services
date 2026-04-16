@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
 import { useAuth } from '@/shared/hooks/useAuth';
+import { useAuthContext } from '@/shared/context/AuthContext';
 import Logo from '@/features/iris/components/Logo';
 
 const loginSchema = z.object({
@@ -17,12 +19,18 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { loading: authLoading } = useAuth(false);
+  const { refreshAuth } = useAuthContext();
   const [formData, setFormData] = useState<LoginFormData>({
     username: '',
     password: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRedirectingAfterLogin, setIsRedirectingAfterLogin] = useState(false);
+
+  useEffect(() => {
+    router.prefetch('/home');
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +43,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setIsRedirectingAfterLogin(true);
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -55,18 +64,13 @@ export default function LoginPage() {
       // HAPUS: sessionStorage.setItem('user', JSON.stringify(data.user))
       // Cookie sudah di-set otomatis oleh server — tidak perlu simpan apapun di sini
 
-      router.push('/home');
-
-      // Fallback redirect tetap dipertahankan
-      setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          window.location.href = '/home';
-        }
-      }, 500);
+      await refreshAuth();
+      router.replace('/home');
 
     } catch (err) {
       console.error('Login error:', err);
       setError('Something went wrong. Please try again.');
+      setIsRedirectingAfterLogin(false);
     } finally {
       setLoading(false);
     }
@@ -78,7 +82,7 @@ export default function LoginPage() {
     if (error) setError('');
   };
 
-  if (authLoading) {
+  if (authLoading && !isRedirectingAfterLogin) {
     return (
       <div className="h-screen flex items-center justify-center bg-white">
         <div className="text-[#11499E] font-medium">Loading...</div>

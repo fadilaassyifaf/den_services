@@ -14,6 +14,8 @@ import type {
 } from '@/core/types/task.types';
 import { CELERY_STATUS_MAP } from '@/core/types/task.types';
 
+// ── Helper ────────────────────────────────────────────────────────────────────
+
 function extractErrorMessage(error: unknown, fallback = 'Unknown error'): string {
   if (typeof error === 'string') return error;
   if (error instanceof Error) return error.message;
@@ -31,30 +33,52 @@ function extractErrorMessage(error: unknown, fallback = 'Unknown error'): string
   return fallback;
 }
 
+// ── Type untuk response FastAPI yang actual ───────────────────────────────────
+
+interface CeleryProgressObject {
+  current: number;
+  total:   number;
+  percent: number;
+}
+
+interface CeleryInfoObject {
+  state?:    string;
+  status?:   string;    // pesan teks progress dari FastAPI
+  message?:  string;
+  ts?:       number;
+  // Pola A: progress sebagai object { current, total, percent }
+  progress?: CeleryProgressObject | number;
+  // Pola B: current + total di root info
+  current?:  number;
+  total?:    number;
+}
+
+// ── Abstract Base ─────────────────────────────────────────────────────────────
+
 export abstract class BaseTaskManager {
-  protected abstract readonly taskName: string;
-  protected abstract readonly apiPath: string;
+  protected abstract readonly taskName:        string;
+  protected abstract readonly apiPath:         string;
   protected abstract readonly defaultFilename: string;
 
   protected readonly API_BASE_URL    = '/api/iris';
   protected readonly POLL_INTERVAL   = 3000;
   protected readonly MAX_POLL_ERRORS = 5;
 
-  private currentTaskId: string | null                        = null;
-  private pollTimeout:   ReturnType<typeof setTimeout> | null = null;
-  private abortController: AbortController | null             = null;
-  private pollErrorCount                                      = 0;
-  private isPolling                                           = false;
+  private currentTaskId:   string | null                        = null;
+  private pollTimeout:     ReturnType<typeof setTimeout> | null = null;
+  private abortController: AbortController | null               = null;
+  private pollErrorCount                                        = 0;
+  private isPolling                                             = false;
 
   protected userNik:  string = '';
   protected fileName: string = '';
 
-  // ─── SUBMIT ────────────────────────────────────────────────────
+  // ─── SUBMIT ──────────────────────────────────────────────────────────────
 
   async submitTask(
     formData: FormData,
     userNik:  string,
-    fileName: string
+    fileName: string,
   ): Promise<TaskSubmitResult> {
     this.userNik  = userNik;
     this.fileName = fileName;
@@ -92,7 +116,8 @@ export abstract class BaseTaskManager {
       catch { throw new Error('Invalid JSON response dari server'); }
 
       // support celery_task_id atau task_id
-      const taskId = (data as any).celery_task_id || data.task_id;
+      const taskId = (data as Record<string, unknown>).celery_task_id as string
+        || data.task_id;
       if (!taskId) throw new Error('Tidak ada task_id dari server.');
 
       this.currentTaskId = taskId;
@@ -124,12 +149,12 @@ export abstract class BaseTaskManager {
     }
   }
 
-  // ─── POLLING ───────────────────────────────────────────────────
+  // ─── POLLING ─────────────────────────────────────────────────────────────
 
   private startPolling(): void {
     if (!this.currentTaskId) return;
     console.log(`[${this.taskName}] Start polling:`, this.currentTaskId);
-    this.scheduleNextPoll(0); // langsung poll pertama
+    this.scheduleNextPoll(0);
   }
 
   private scheduleNextPoll(delay = this.POLL_INTERVAL): void {
@@ -140,8 +165,8 @@ export abstract class BaseTaskManager {
   private async pollTaskStatus(): Promise<void> {
     if (this.isPolling || !this.currentTaskId) return;
 
-    this.isPolling  = true;
-    const taskId    = this.currentTaskId;
+    this.isPolling = true;
+    const taskId   = this.currentTaskId;
 
     try {
       const url = `${window.location.origin}${this.API_BASE_URL}/tasks/status/${taskId}`;
@@ -172,8 +197,8 @@ export abstract class BaseTaskManager {
       const raw: TaskStatusResponse = JSON.parse(rawBody);
       this.pollErrorCount = 0;
 
-      // uncomment untuk debug:
-      // console.log(`[${this.taskName}] Raw:`, JSON.stringify(raw, null, 2));
+      // Debug — aktifkan saat butuh troubleshoot:
+      // console.log(`[${this.taskName}] Raw response:`, JSON.stringify(raw, null, 2));
 
       const normalized = this.normalizeStatus(raw, taskId);
       useTaskStore.getState().applyStatusUpdate(normalized);
@@ -184,7 +209,6 @@ export abstract class BaseTaskManager {
         return;
       }
 
-      // masih berjalan → schedule berikutnya
       this.scheduleNextPoll();
 
     } catch (error: unknown) {
@@ -194,7 +218,7 @@ export abstract class BaseTaskManager {
 
       if (this.pollErrorCount >= this.MAX_POLL_ERRORS) {
         this.cancelPolling();
-        useTaskStore.getState().failTask(taskId, `Gagal poll: ${msg}`);
+        useTaskStore.getState().failTask(taskId, `Gagal poll setelah ${this.MAX_POLL_ERRORS}x: ${msg}`);
         return;
       }
 
@@ -205,53 +229,107 @@ export abstract class BaseTaskManager {
     }
   }
 
-  // ─── NORMALIZE STATUS ──────────────────────────────────────────
+  // ─── NORMALIZE STATUS ─────────────────────────────────────────────────────
+  //
+  // FastAPI response shape yang di-handle:
+  //
+  // PROGRESS:
+  // {
+  //   "task_id": "xxx",
+  //   "status": "PROGRESS",
+  //   "info": {
+  //     "state": "PROGRESS",
+  //     "status": "Process Fix Route for TBG-xxx completed.",  ← pesan teks
+  //     "ts": 1776070025.023648,
+  //     "progress": {
+  //       "current": 6,
+  //       "total": 55,
+  //       "percent": 10.91     ← ini yang kita ambil
+  //     }
+  //   }
+  // }
+  //
+  // SUCCESS:
+  // { "task_id": "xxx", "status": "SUCCESS", "result": { ... } }
+  //
+  // FAILURE:
+  // { "task_id": "xxx", "status": "FAILURE", "error": "..." }
 
   private normalizeStatus(
     raw: TaskStatusResponse,
-    taskId: string
+    taskId: string,
   ): NormalizedTaskStatus {
 
     const status: TaskStatusState = CELERY_STATUS_MAP[raw.status] ?? 'processing';
 
-    // ── Progress: 3 pola ────────────────────────────────────────
+    // ── Progress ────────────────────────────────────────────────────────────
     let progress = 0;
 
     if (status === 'completed') {
       progress = 100;
+
     } else if (status === 'pending') {
       progress = 0;
+
     } else if (typeof raw.info === 'object' && raw.info !== null) {
-      if (typeof raw.info.progress === 'number') {
-        // Pola 1: info.progress langsung (0-100)
-        progress = Math.min(100, Math.max(0, Math.round(raw.info.progress)));
+      const info = raw.info as CeleryInfoObject;
+
+      if (typeof info.progress === 'object' && info.progress !== null) {
+        // ✅ Pola A — FastAPI actual:
+        // info.progress = { current: 6, total: 55, percent: 10.91 }
+        const prog = info.progress as CeleryProgressObject;
+
+        if (typeof prog.percent === 'number') {
+          // Gunakan percent langsung — paling akurat
+          progress = Math.min(100, Math.max(0, Math.round(prog.percent)));
+
+        } else if (
+          typeof prog.current === 'number' &&
+          typeof prog.total   === 'number' &&
+          prog.total > 0
+        ) {
+          // Fallback: hitung dari current/total jika percent tidak ada
+          progress = Math.min(
+            100,
+            Math.round((prog.current / prog.total) * 100)
+          );
+        }
+
+      } else if (typeof info.progress === 'number') {
+        // Pola B — info.progress langsung number (0-100)
+        progress = Math.min(100, Math.max(0, Math.round(info.progress)));
 
       } else if (
-        typeof raw.info.current === 'number' &&
-        typeof raw.info.total   === 'number' &&
-        raw.info.total > 0
+        typeof info.current === 'number' &&
+        typeof info.total   === 'number' &&
+        info.total > 0
       ) {
-        // Pola 2: info.current + info.total → hitung %
+        // Pola C — current + total di root info (bukan nested)
         progress = Math.min(
           100,
-          Math.round((raw.info.current / raw.info.total) * 100)
+          Math.round((info.current / info.total) * 100)
         );
       }
+
     } else if (typeof raw.progress === 'number') {
-      // Pola 3: progress di root JSON
+      // Pola D — progress di root JSON response
       progress = Math.min(100, Math.max(0, Math.round(raw.progress)));
     }
 
-    // ── Message ─────────────────────────────────────────────────
+    // ── Message (teks log untuk activity feed) ───────────────────────────────
     let message = '';
 
     if (typeof raw.info === 'string') {
       message = raw.info;
+
     } else if (raw.info && typeof raw.info === 'object') {
+      const info = raw.info as CeleryInfoObject;
+      // Prioritas: status > message (keduanya bisa berisi teks progress)
       message =
-        (typeof raw.info.message === 'string' ? raw.info.message : '') ||
-        (typeof raw.info.status  === 'string' ? raw.info.status  : '');
+        (typeof info.status  === 'string' && info.status  ? info.status  : '') ||
+        (typeof info.message === 'string' && info.message ? info.message : '');
     }
+
     if (!message && raw.error) {
       message = typeof raw.error === 'string' ? raw.error : JSON.stringify(raw.error);
     }
@@ -259,7 +337,19 @@ export abstract class BaseTaskManager {
       message = raw.exc_message;
     }
 
-    // ── Result ──────────────────────────────────────────────────
+    // Fallback message jika tidak ada teks sama sekali
+    if (!message && status === 'processing') {
+      const info = typeof raw.info === 'object' && raw.info !== null
+        ? raw.info as CeleryInfoObject
+        : null;
+      const prog = info?.progress;
+      if (prog && typeof prog === 'object') {
+        const p = prog as CeleryProgressObject;
+        message = `Processing... step ${p.current} of ${p.total} (${Math.round(p.percent)}%)`;
+      }
+    }
+
+    // ── Result (untuk download setelah selesai) ──────────────────────────────
     const resultObj =
       raw.result && typeof raw.result === 'object'
         ? (raw.result as Record<string, unknown>)
@@ -268,15 +358,15 @@ export abstract class BaseTaskManager {
     const downloadUrl = resultObj?.download_url as string | undefined;
     const outputFile  = (resultObj?.output_file || resultObj?.filename) as string | undefined;
 
-    // ── Logs ────────────────────────────────────────────────────
+    // ── Build log entry ──────────────────────────────────────────────────────
     const logs: LogEntry[] = message
       ? [{
           timestamp: new Date().toISOString(),
           message,
           level:
-            status === 'failed'    ? 'error'
-            : status === 'completed' ? 'success'
-            : 'info',
+            status === 'failed'    ? 'error'   :
+            status === 'completed' ? 'success'  :
+            'info',
         }]
       : [];
 
@@ -292,7 +382,7 @@ export abstract class BaseTaskManager {
     };
   }
 
-  // ─── HANDLE ZIP ────────────────────────────────────────────────
+  // ─── HANDLE ZIP RESPONSE ─────────────────────────────────────────────────
 
   private async handleZipResponse(response: Response, taskId: string): Promise<void> {
     this.cancelPolling();
@@ -328,7 +418,7 @@ export abstract class BaseTaskManager {
     }
   }
 
-  // ─── HANDLE FINISH (JSON completed/failed) ─────────────────────
+  // ─── HANDLE FINISH (JSON SUCCESS/FAILURE) ────────────────────────────────
 
   private async onTaskFinished(normalized: NormalizedTaskStatus): Promise<void> {
     const { status, task_id, download_url, output_file, message } = normalized;
@@ -357,7 +447,7 @@ export abstract class BaseTaskManager {
     }
   }
 
-  // ─── SAVE HISTORY ──────────────────────────────────────────────
+  // ─── SAVE TO HISTORY ─────────────────────────────────────────────────────
 
   private async saveToHistory(payload: HistoryDBPayload): Promise<void> {
     try {
@@ -372,7 +462,7 @@ export abstract class BaseTaskManager {
     }
   }
 
-  // ─── CANCEL ────────────────────────────────────────────────────
+  // ─── CANCEL POLLING ──────────────────────────────────────────────────────
 
   cancelPolling(): void {
     if (this.pollTimeout) {

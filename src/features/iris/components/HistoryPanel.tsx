@@ -64,20 +64,28 @@ export default function HistoryPanel({ userNik, refreshTrigger = 0 }: HistoryPan
     }
   };
 
+  // Pastikan string diparsing sebagai UTC — PostgreSQL mengembalikan tanpa 'Z'
+  const toUTC = (iso: string) =>
+    iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`;
+
   const formatDate = (dateString: string) => {
-    const d = new Date(dateString);
+    const d = new Date(toUTC(dateString));
     return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' });
   };
 
   const formatTime = (dateString: string) => {
-    const d = new Date(dateString);
+    const d = new Date(toUTC(dateString));
     return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   };
 
   const handleDownload = async (fileUrl: string, filename: string) => {
     try {
-      const response = await fetch(fileUrl);
-      if (!response.ok) throw new Error('HTTP error');
+      const proxyUrl = `/api/iris/files/download?path=${encodeURIComponent(fileUrl)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        const { error } = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(error || `HTTP ${response.status}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

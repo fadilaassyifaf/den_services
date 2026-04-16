@@ -109,7 +109,7 @@ export default function Header({ user }: HeaderProps) {
 
             {/* Dashboard */}
             <button
-              onClick={() => router.push('/tned')}
+              onClick={() => router.push('http://localhost:3002')}
               className="px-3 py-1 text-xs text-[#11499E] rounded-md hover:bg-gray-200 transition font-medium"
             >
               Dashboard

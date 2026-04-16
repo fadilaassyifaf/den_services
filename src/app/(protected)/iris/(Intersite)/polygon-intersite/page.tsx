@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/shared/hooks/useAuth';
 import Header from '@/features/iris/components/Header';
 import Sidebar from '@/features/iris/components/Sidebar';
@@ -21,6 +22,138 @@ function extractErrorMessage(err: unknown, fallback = 'An error occurred'): stri
     try { return JSON.stringify(err); } catch { return fallback; }
   }
   return fallback;
+}
+
+// ── Excel Preview Modal ────────────────────────────────────────────────────────
+interface SheetData {
+  name: string;
+  headers: string[];
+  rows: string[][];
+}
+
+function ExcelPreviewModal({ file, onClose }: { file: File; onClose: () => void }) {
+  const [sheets, setSheets] = useState<SheetData[]>([]);
+  const [activeSheet, setActiveSheet] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const parsed: SheetData[] = workbook.SheetNames.map((name: string) => {
+          const ws = workbook.Sheets[name];
+          const json: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          const headers = (json[0] || []).map(String);
+          const rows = json.slice(1).map(row =>
+            headers.map((_, i) => String((row as any)[i] ?? ''))
+          );
+          return { name, headers, rows };
+        });
+        setSheets(parsed);
+        setLoading(false);
+      } catch {
+        setError('Gagal membaca file Excel');
+        setLoading(false);
+      }
+    };
+    reader.onerror = () => { setError('Gagal membaca file'); setLoading(false); };
+    reader.readAsArrayBuffer(file);
+  }, [file]);
+
+  const current = sheets[activeSheet];
+  const PREVIEW_ROWS = 50;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-[#11499E]">Preview File Excel</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {sheets.length > 1 && (
+          <div className="flex gap-1 px-6 pt-3 pb-0 border-b border-gray-100 flex-shrink-0 overflow-x-auto">
+            {sheets.map((s, i) => (
+              <button key={i} onClick={() => setActiveSheet(i)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition whitespace-nowrap ${
+                  activeSheet === i ? 'border-[#11499E] text-[#11499E] bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {loading ? (
+            <div className="flex items-center justify-center h-48 gap-3">
+              <svg className="animate-spin w-6 h-6 text-[#11499E]" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-sm text-gray-500">Membaca file...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-48 gap-2 text-red-500">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm">{error}</span>
+            </div>
+          ) : current ? (
+            <>
+              <div className="flex items-center gap-4 px-6 py-2.5 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+                <span className="text-[11px] text-gray-500"><span className="font-semibold text-[#11499E]">{current.rows.length}</span> rows</span>
+                <span className="text-[11px] text-gray-500"><span className="font-semibold text-[#11499E]">{current.headers.length}</span> columns</span>
+                {current.rows.length > PREVIEW_ROWS && (
+                  <span className="text-[11px] text-amber-500 font-medium">Menampilkan {PREVIEW_ROWS} dari {current.rows.length} baris</span>
+                )}
+              </div>
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr>
+                      <th className="bg-[#11499E] text-white px-3 py-2 text-center font-semibold border-r border-blue-400 w-10 sticky left-0">#</th>
+                      {current.headers.map((h, i) => (
+                        <th key={i} className="bg-[#11499E] text-white px-4 py-2 text-left font-semibold whitespace-nowrap border-r border-blue-400 last:border-r-0">
+                          {h || `Col ${i + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {current.rows.slice(0, PREVIEW_ROWS).map((row, ri) => (
+                      <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                        <td className="px-3 py-2 text-center text-gray-400 font-mono border-r border-gray-100 sticky left-0 bg-inherit">{ri + 1}</td>
+                        {row.map((cell, ci) => (
+                          <td key={ci} className="px-4 py-2 text-gray-600 border-r border-gray-100 last:border-r-0 max-w-[200px] truncate" title={cell}>
+                            {cell || <span className="text-gray-300">—</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Sheet kosong</div>
+          )}
+        </div>
+        <div className="px-6 py-3 border-t border-gray-100 flex justify-end flex-shrink-0">
+          <button onClick={onClose} className="px-5 py-2 bg-[#11499E] text-white text-sm font-semibold rounded-xl hover:bg-[#0d3a7d] transition">Tutup</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Read Me Modal ──────────────────────────────────────────────────────────────
@@ -91,7 +224,7 @@ function ReadMeModal({ onClose }: { onClose: () => void }) {
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => window.open('http://10.83.10.16:8000/template/Template_Polygon_Based.xlsx', '_blank')}
+                onClick={() => window.open('http://10.89.12.54:8000/template/intersite/Template_Polygon_Based.xlsx', '_blank')}
                 className="w-full px-4 py-2.5 bg-[#1E99D5] text-white text-sm rounded-xl hover:bg-[#1a88bd] transition font-semibold flex items-center justify-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,7 +234,7 @@ function ReadMeModal({ onClose }: { onClose: () => void }) {
               </button>
               <button
                 type="button"
-                onClick={() => window.open('http://10.83.10.16:8000/template/Polygon_Sample.kmz', '_blank')}
+                onClick={() => window.open('http://10.89.12.54:8000/template/intersite/Polygon_Sample.kmz', '_blank')}
                 className="w-full px-4 py-2.5 bg-[#1E99D5] text-white text-sm rounded-xl hover:bg-[#1a88bd] transition font-semibold flex items-center justify-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,6 +290,7 @@ export default function PolygonIntersitePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [historyTrigger, setHistoryTrigger] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
   const [showReadMe, setShowReadMe] = useState(false);
 
   const excelFileRef = useRef<HTMLInputElement>(null);
@@ -264,6 +398,7 @@ export default function PolygonIntersitePage() {
         .minimal-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
       `}</style>
 
+      {showPreview && excelFile && <ExcelPreviewModal file={excelFile} onClose={() => setShowPreview(false)} />}
       {showReadMe && <ReadMeModal onClose={() => setShowReadMe(false)} />}
 
       <div className="h-screen bg-white flex flex-col overflow-hidden">
@@ -295,7 +430,8 @@ export default function PolygonIntersitePage() {
 
                 {/* Upload boxes */}
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {/* Site List */}
+
+                  {/* Site List Upload */}
                   <div
                     onClick={() => excelFileRef.current?.click()}
                     className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#11499E] transition min-h-[160px]
@@ -308,6 +444,17 @@ export default function PolygonIntersitePage() {
                       <>
                         <p className="text-xs font-semibold text-[#11499E] text-center px-4 truncate max-w-full">{excelFile.name}</p>
                         <p className="text-[10px] text-gray-400 mt-0.5">{(excelFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setShowPreview(true); }}
+                          className="mt-2 flex items-center gap-1 px-3 py-1 border border-[#1E99D5] text-[#1E99D5] text-[10px] font-medium rounded-lg hover:bg-[#1E99D5]/10 transition"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Preview Data
+                        </button>
                       </>
                     ) : (
                       <>
@@ -320,7 +467,7 @@ export default function PolygonIntersitePage() {
                       onChange={(e) => setExcelFile(e.target.files?.[0] || null)} />
                   </div>
 
-                  {/* Polygon File */}
+                  {/* Polygon File Upload */}
                   <div
                     onClick={() => polygonFileRef.current?.click()}
                     className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#11499E] transition min-h-[160px]
@@ -337,17 +484,18 @@ export default function PolygonIntersitePage() {
                     ) : (
                       <>
                         <p className="text-xs font-medium text-gray-600">Upload polygon file</p>
-                        <p className="text-xs font-medium text-gray-600">(Polygon geometry file)</p>
+                        <p className="text-xs font-medium text-gray-600">(Optional - Polygon geometry file)</p>
                         <p className="text-[10px] text-gray-400 mt-0.5 text-center">(.kmz, .kml, .parquet, .gpkg)</p>
                       </>
                     )}
                     <input ref={polygonFileRef} type="file" accept=".kmz,.kml,.parquet,.gpkg" className="hidden"
                       onChange={(e) => setPolygonFile(e.target.files?.[0] || null)} />
                   </div>
+
                 </div>
 
-                {/* Parameters grid + messages + button */}
-                <div className="flex flex-col gap-2 mb-3">
+                {/* Parameters grid */}
+                <div className="flex flex-col gap-2 mb-3 mt-6">
                   <div className="grid grid-cols-2 gap-3">
 
                     {/* SPOF Threshold */}
@@ -435,44 +583,43 @@ export default function PolygonIntersitePage() {
                       </select>
                     </Field>
 
-                  </div>
+                    {/* Error / Success */}
+                    {error && (
+                      <div className="px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-start gap-2">
+                        <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span>{error}</span>
+                      </div>
+                    )}
+                    {success && (
+                      <div className="px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-xs flex items-start gap-2">
+                        <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>{success}</span>
+                      </div>
+                    )}
 
-                  {/* Error / Success messages */}
-                  {error && (
-                    <div className="px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-start gap-2">
-                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                      <span>{error}</span>
+                    {/* Execute Button */}
+                    <div className="flex justify-end mt-2">
+                      <button
+                        type="submit" disabled={executing}
+                        className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
+                      >
+                        {executing ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Executing...
+                          </span>
+                        ) : 'Execute'}
+                      </button>
                     </div>
-                  )}
-                  {success && (
-                    <div className="px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-xs flex items-start gap-2">
-                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span>{success}</span>
-                    </div>
-                  )}
 
-                  {/* Execute Button */}
-                  <div className="flex justify-end mt-2">
-                    <button
-                      type="submit" disabled={executing}
-                      className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
-                    >
-                      {executing ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Executing...
-                        </span>
-                      ) : 'Execute'}
-                    </button>
                   </div>
-
                 </div>
               </form>
             </div>

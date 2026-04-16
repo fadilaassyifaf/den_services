@@ -4,8 +4,8 @@ import { query } from '@/core/api/db';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userNik = searchParams.get('user_nik');
+    const url = new URL(request.url);
+    const userNik = url.searchParams.get('user_nik');
 
     let result;
     if (userNik) {

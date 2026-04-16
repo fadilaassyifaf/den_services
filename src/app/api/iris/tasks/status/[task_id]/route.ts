@@ -8,10 +8,10 @@ const BACKEND_BASE = process.env.BACKEND_URL || 'http://10.89.12.54:8000';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ task_id: string }> }
+  context: { params: Promise<{ task_id: string }> }
 ) {
   try {
-    const { task_id } = await params;
+    const { task_id } = await context.params;
 
     if (!task_id?.trim()) {
       return NextResponse.json({ error: 'task_id is required' }, { status: 400 });

@@ -4,11 +4,11 @@ import { verifyAdmin, AuthError } from '@/core/auth/verifyToken';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ nik: string }> }
+  context: { params: Promise<{ nik: string }> }
 ) {
   try {
     await verifyAdmin(request);
-    const { nik } = await params;
+    const { nik } = await context.params;
 
     const result = await query(
       `SELECT mi.id, mi.module_name, mi.module_group
@@ -33,11 +33,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ nik: string }> }
+  context: { params: Promise<{ nik: string }> }
 ) {
   try {
     await verifyAdmin(request);
-    const { nik } = await params;
+    const { nik } = await context.params;
     const { moduleIds } = await request.json();
 
     if (!Array.isArray(moduleIds)) {

@@ -1,75 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://10.83.10.16:8000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://10.89.12.54:8000';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔔 [Proxy] POST /api/iris/drm-intersite received');
+    const cookieStore = await cookies();
+    const token = cookieStore.get('auth-token')?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     let formData: FormData;
     try {
       formData = await request.formData();
-    } catch (parseError) {
-      console.error('❌ [Proxy] Failed to parse form data:', parseError);
+    } catch {
       return NextResponse.json(
         { error: 'Invalid form data', detail: 'Could not parse multipart/form-data' },
         { status: 400 }
       );
     }
 
-    let response: Response;
-    try {
-      response = await fetch(`${BACKEND_URL}/report/drm-intersite`, {
-        method: 'POST',
-        body: formData,
-      });
-    } catch (fetchError: unknown) {
-      const detail =
-        fetchError instanceof Error ? fetchError.message :
-        typeof fetchError === 'string' ? fetchError :
-        'Cannot reach backend';
-      console.error('❌ [Proxy] Cannot reach backend:', detail);
-      return NextResponse.json(
-        { error: 'Backend unreachable', detail },
-        { status: 503 }
-      );
-    }
-
-    console.log('📡 [Proxy] Backend response status:', response.status, response.statusText);
+    const response = await fetch(`${BACKEND_URL}/report/drm-intersite`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
 
     if (!response.ok) {
       let errorData: Record<string, unknown>;
       try {
-        const rawText = await response.text();
-        errorData = rawText ? JSON.parse(rawText) : { error: 'Backend error' };
+        const text = await response.text();
+        errorData = text ? JSON.parse(text) : { error: 'Backend error' };
       } catch {
         errorData = { error: 'Backend error', detail: response.statusText };
       }
       return NextResponse.json(errorData, { status: response.status });
     }
 
-    let data: unknown;
-    try {
-      const rawText = await response.text();
-      data = JSON.parse(rawText);
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON from backend', detail: 'Backend returned non-JSON response' },
-        { status: 502 }
-      );
-    }
+    // DRM returns ZIP directly — stream it back to client
+    const contentType = response.headers.get('Content-Type') ?? 'application/zip';
+    const contentDisposition = response.headers.get('Content-Disposition') ?? 'attachment; filename="drm_result.zip"';
+    const body = await response.arrayBuffer();
 
-    return NextResponse.json(data);
+    return new NextResponse(body, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': contentDisposition,
+        'Content-Length': String(body.byteLength),
+      },
+    });
 
   } catch (error: unknown) {
-    const detail =
-      error instanceof Error ? error.message :
-      typeof error === 'string' ? error :
-      'Unexpected proxy error';
-    console.error('❌ [Proxy] Unexpected error:', detail);
-    return NextResponse.json(
-      { error: 'Proxy error', detail },
-      { status: 500 }
-    );
+    const detail = error instanceof Error ? error.message : 'Unexpected proxy error';
+    console.error('[DRM Intersite] Proxy error:', detail);
+    return NextResponse.json({ error: 'Proxy error', detail }, { status: 500 });
   }
 }

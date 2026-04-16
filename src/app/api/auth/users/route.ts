@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ── Step 1: Register via FastAPI ────────────────────────────────────────
+    // ── Step 1: Register via FastAPI (tanpa role) ───────────────────────────
     const registerRes = await fetchFastAPI('/auth/register', {
       method: 'POST',
       token,
@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
         fullname: name,
         email,
         department,
-        role: role ?? 'user',
       },
     });
 
@@ -85,7 +84,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Step 2: Assign modules via FastAPI ──────────────────────────────────
+    // ── Step 2: Set role via FastAPI ────────────────────────────────────────
+    const updateRes = await fetchFastAPI('/users/update-user', {
+      method: 'POST',
+      token,
+      body: {
+        username,
+        password,
+        fullname: name,
+        role: role ?? 'user',
+      },
+    });
+
+    if (!updateRes.ok) {
+      const err = await updateRes.json().catch(() => ({}));
+      console.error('[CreateUser] Failed to set role:', err);
+      // User sudah terdaftar tapi role gagal di-set — kembalikan warning
+      return NextResponse.json(
+        { message: 'User created but role could not be set', detail: err.detail },
+        { status: 207 }
+      );
+    }
+
+    // ── Step 3: Assign modules via FastAPI ──────────────────────────────────
     if (Array.isArray(moduleIds) && moduleIds.length > 0) {
       const newUser = await query(
         'SELECT id FROM users WHERE username = $1',

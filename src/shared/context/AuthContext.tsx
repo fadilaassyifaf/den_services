@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,37 +14,37 @@ import { useRouter } from 'next/navigation';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
-  id: number;
-  nik: string;
+  id:       number;
+  nik:      string;
   username: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user' | 'guest' | 'superuser';
+  name:     string;
+  email:    string;
+  role:     'admin' | 'superuser' | 'user' | 'guest';
 }
 
 export interface UserModule {
-  id: number;
-  module_name: string;
+  id:           number;
+  module_name:  string;
   module_group: string;
 }
 
 interface AuthState {
-  user: AuthUser | null;
-  modules: UserModule[];
-  loading: boolean;
+  user:            AuthUser | null;
+  modules:         UserModule[];
+  loading:         boolean;
   isAuthenticated: boolean;
 }
 
-interface RoleGuardProps {
-  children: React.ReactNode;
-  allowedRoles: ('admin' | 'user' | 'guest' | 'superuser')[];
-}
-
 interface AuthContextValue extends AuthState {
-  hasAccess: (moduleGroup: string) => boolean;
-  logout: () => Promise<void>;
+  hasAccess:   (moduleGroup: string) => boolean;
+  logout:      () => Promise<void>;
   refreshAuth: () => Promise<void>;
 }
+
+// ─── Konstanta ────────────────────────────────────────────────────────────────
+
+// Role yang punya akses penuh ke semua halaman termasuk /admin
+const SUPERUSER_ROLES: AuthUser['role'][] = ['admin', 'superuser'];
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -53,10 +54,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+
   const [state, setState] = useState<AuthState>({
-    user: null,
-    modules: [],
-    loading: true,
+    user:            null,
+    modules:         [],
+    loading:         true,
     isAuthenticated: false,
   });
 
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch('/api/auth/validate-token', {
         credentials: 'include',
-        cache: 'no-store',
+        cache:       'no-store',
       });
 
       if (!res.ok) {
@@ -80,9 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setState({
-        user: data.user,
-        modules: data.modules ?? [],
-        loading: false,
+        user:            data.user,
+        modules:         data.modules ?? [],
+        loading:         false,
         isAuthenticated: true,
       });
     } catch {
@@ -94,11 +96,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchAuth();
   }, [fetchAuth]);
 
-  // User punya akses ke halaman jika memiliki minimal 1 module dalam group tersebut
   const hasAccess = useCallback(
     (moduleGroup: string): boolean => {
       if (!state.user) return false;
-      if (state.user.role === 'admin') return true;
+
+      // Superuser roles: akses ke semua halaman tanpa cek module
+      if (SUPERUSER_ROLES.includes(state.user.role)) return true;
+
+      // Guard khusus halaman 'admin': HANYA bisa diakses superuser roles
+      // User biasa tidak bisa masuk walau punya module apapun
+      if (moduleGroup === 'admin') return false;
+
+      // Module-based access untuk halaman non-admin
       return state.modules.some((m) => m.module_group === moduleGroup);
     },
     [state.user, state.modules]
@@ -118,8 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchAuth();
   }, [fetchAuth]);
 
+  const value = useMemo<AuthContextValue>(
+    () => ({ ...state, hasAccess, logout, refreshAuth }),
+    [state, hasAccess, logout, refreshAuth]
+  );
+
   return (
-    <AuthContext.Provider value={{ ...state, hasAccess, logout, refreshAuth }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

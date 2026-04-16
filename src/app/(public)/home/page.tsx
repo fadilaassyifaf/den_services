@@ -3,10 +3,48 @@
 import { useAuth } from '@/shared/hooks/useAuth';
 import Header from '@/features/iris/components/Header';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function HomePage() {
   const router = useRouter();
   const { user, loading } = useAuth(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const logoutWithBeacon = () => {
+      if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
+        navigator.sendBeacon('/api/auth/logout');
+        return;
+      }
+
+      // Fallback untuk browser yang tidak support sendBeacon.
+      void fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+      });
+    };
+
+    const handleBackButton = () => {
+      logoutWithBeacon();
+      window.location.replace('/login');
+    };
+
+    const handlePageHide = () => {
+      logoutWithBeacon();
+    };
+
+    // Tambahkan 1 history state agar tombol back bisa diintercept dari halaman home.
+    window.history.pushState({ fromHome: true }, '', window.location.href);
+    window.addEventListener('popstate', handleBackButton);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      window.removeEventListener('popstate', handleBackButton);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [user]);
 
   if (loading) {
     return (

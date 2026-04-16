@@ -88,8 +88,12 @@ export default function ProgressLog({ userNik, onTasksChange }: ProgressLogProps
     if (!task.download_url) return;
     setDownloading(task.task_id);
     try {
-      const response = await fetch(task.download_url);
-      if (!response.ok) throw new Error('Failed to download');
+      const proxyUrl = `/api/iris/files/download?path=${encodeURIComponent(task.download_url)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        const { error } = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(error || `HTTP ${response.status}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
