@@ -198,6 +198,27 @@ function ReadMeModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div>
+            <p className="text-xs font-bold text-[#11499E] mb-2 uppercase tracking-wide">Task States</p>
+            <div className="space-y-1.5">
+              {[
+                { state: 'PENDING', desc: 'Snapping sites to topology' },
+                { state: 'PROGRESS', desc: 'Designing rings along topology' },
+                { state: 'SUCCESS', desc: 'Design complete with topology constraints' },
+                { state: 'FAILURE', desc: 'Topology snapping or design failed' },
+              ].map(({ state, desc }) => (
+                <div key={state} className="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono flex-shrink-0 ${
+                    state === 'SUCCESS' ? 'bg-green-100 text-green-700' :
+                    state === 'FAILURE' ? 'bg-red-100 text-red-700' :
+                    state === 'PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                    'bg-gray-200 text-gray-600'
+                  }`}>{state}</span>
+                  <span className="text-xs text-gray-600">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
             <p className="text-xs font-bold text-[#11499E] mb-2 uppercase tracking-wide">Templates</p>
             <div className="flex flex-col gap-2">
               <button
@@ -256,12 +277,12 @@ export default function TopologyIntersitePage() {
 
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [topologyFile, setTopologyFile] = useState<File | null>(null);
+  const [routeFile, setRouteFile] = useState<File | null>(null);
   const [spofThreshold, setSpofThreshold] = useState('');
   const [spofThresholdError, setSpofThresholdError] = useState('');
   const [distanceTolerance, setDistanceTolerance] = useState('');
   const [distanceToleranceError, setDistanceToleranceError] = useState('');
   const [program, setProgram] = useState('');
-  const [boq, setBoq] = useState('false');
   const [operator, setOperator] = useState('');
   const [separator, setSeparator] = useState('');
   const [routePreference, setRoutePreference] = useState('');
@@ -274,6 +295,7 @@ export default function TopologyIntersitePage() {
 
   const excelFileRef = useRef<HTMLInputElement>(null);
   const topologyFileRef = useRef<HTMLInputElement>(null);
+  const routeFileRef = useRef<HTMLInputElement>(null);
   const taskManagerRef = useRef<TopologyIntersiteTask | null>(null);
 
   useEffect(() => {
@@ -324,10 +346,10 @@ export default function TopologyIntersitePage() {
     const formData = new FormData();
     formData.append('excel_file', excelFile);
     if (topologyFile) formData.append('topology_file', topologyFile);
+    if (routeFile) formData.append('route_file', routeFile);
     formData.append('spof_threshold', spofThreshold);
     formData.append('distance_tolerance', distanceTolerance);
     formData.append('program', program);
-    formData.append('boq', boq);
     formData.append('operator', operator);
     formData.append('separator', separator);
     formData.append('route_preference', routePreference);
@@ -351,9 +373,11 @@ export default function TopologyIntersitePage() {
         setExecuting(false);
         setExcelFile(null);
         setTopologyFile(null);
+        setRouteFile(null);
         setHistoryTrigger(prev => prev + 1);
         if (excelFileRef.current) excelFileRef.current.value = '';
         if (topologyFileRef.current) topologyFileRef.current.value = '';
+        if (routeFileRef.current) routeFileRef.current.value = '';
       } else {
         setError(result?.error || 'Failed to submit task');
         setExecuting(false);
@@ -419,7 +443,7 @@ export default function TopologyIntersitePage() {
               <form onSubmit={handleExecute}>
 
                 {/* Upload boxes */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-3 gap-3 mb-6">
 
                   {/* Site List Upload */}
                   <div
@@ -474,12 +498,44 @@ export default function TopologyIntersitePage() {
                     ) : (
                       <>
                         <p className="text-xs font-medium text-gray-600">Upload topology file</p>
-                        <p className="text-xs font-medium text-gray-600">(Optional - Fixed route corridors)</p>
+                        <p className="text-xs font-medium text-gray-600">(Topology geometry file)</p>
                         <p className="text-[10px] text-gray-400 mt-0.5 text-center">(.kmz, .kml, .parquet, .gpkg)</p>
                       </>
                     )}
                     <input ref={topologyFileRef} type="file" accept=".kmz,.kml,.parquet,.gpkg" className="hidden"
                       onChange={(e) => setTopologyFile(e.target.files?.[0] || null)} />
+                  </div>
+
+                  {/* Route File Upload */}
+                  <div
+                    onClick={() => routeFileRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#11499E] transition min-h-[160px]
+                      ${routeFile ? 'border-[#11499E] bg-blue-50' : 'border-gray-300 bg-white'}`}
+                  >
+                    <svg className="w-8 h-8 text-[#11499E] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    {routeFile ? (
+                      <>
+                        <p className="text-xs font-semibold text-[#11499E] text-center px-4 truncate max-w-full">{routeFile.name}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{(routeFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setRouteFile(null); if (routeFileRef.current) routeFileRef.current.value = ''; }}
+                          className="mt-2 flex items-center gap-1 px-3 py-1 border border-red-300 text-red-500 text-[10px] font-medium rounded-lg hover:bg-red-50 transition"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-medium text-gray-600">Upload route file</p>
+                        <p className="text-xs font-medium text-gray-600">(Optional)</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5 text-center">(.kmz, .kml, .parquet, .gpkg)</p>
+                      </>
+                    )}
+                    <input ref={routeFileRef} type="file" accept=".kmz,.kml,.parquet,.gpkg" className="hidden"
+                      onChange={(e) => setRouteFile(e.target.files?.[0] || null)} />
                   </div>
 
                 </div>
@@ -493,7 +549,7 @@ export default function TopologyIntersitePage() {
                       <input
                         type="text" inputMode="numeric" pattern="\d*" value={spofThreshold}
                         onChange={(e) => handleIntegerInput(e.target.value, setSpofThreshold, setSpofThresholdError)}
-                        placeholder="Input Value"
+                        placeholder="Input Value (default:300m)"
                         className={`w-full px-3 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] text-[#11499E]
                           ${spofThresholdError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                       />
@@ -512,7 +568,7 @@ export default function TopologyIntersitePage() {
                       <input
                         type="text" inputMode="numeric" pattern="\d*" value={distanceTolerance}
                         onChange={(e) => handleIntegerInput(e.target.value, setDistanceTolerance, setDistanceToleranceError)}
-                        placeholder="Input Value"
+                        placeholder="Input Value (default:500m)"
                         className={`w-full px-3 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] text-[#11499E]
                           ${distanceToleranceError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                       />
@@ -581,17 +637,6 @@ export default function TopologyIntersitePage() {
                       </select>
                     </Field>
 
-                    {/* BOQ */}
-                    <Field label="BOQ" hint="Output file to choose">
-                      <select
-                        value={boq} onChange={(e) => setBoq(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]"
-                      >
-                        <option value="false">False</option>
-                        <option value="true">True</option>
-                      </select>
-                    </Field>
-
                     {/* Error / Success */}
                     {error && (
                       <div className="px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-start gap-2">
@@ -610,24 +655,22 @@ export default function TopologyIntersitePage() {
                       </div>
                     )}
 
-                    {/* Execute Button */}
-                    <div className="flex justify-end items-end mt-5">
-                      <button
-                        type="submit" disabled={executing}
-                        className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
-                      >
-                        {executing ? (
-                          <span className="flex items-center gap-2">
-                            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Executing...
-                          </span>
-                        ) : 'Execute'}
-                      </button>
-                    </div>
-
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <button
+                      type="submit" disabled={executing}
+                      className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
+                    >
+                      {executing ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Executing...
+                        </span>
+                      ) : 'Execute'}
+                    </button>
                   </div>
                 </div>
               </form>

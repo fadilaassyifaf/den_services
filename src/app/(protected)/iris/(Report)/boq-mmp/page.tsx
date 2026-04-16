@@ -345,8 +345,8 @@ export default function BoqMmpPage() {
                   <Field label="Separator" hint="Segment endpoint separator" required>
                     <select value={separator} onChange={(e) => setSeparator(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]">
-                      <option value=";">; (semicolon)</option>
-                      <option value="-">- (dash)</option>
+                      <option value=";">;</option>
+                      <option value="-">-</option>
                     </select>
                   </Field>
 
@@ -379,8 +379,8 @@ export default function BoqMmpPage() {
                   <Field label="Device in Site" hint="Equipment type at site locations" required>
                     <select value={deviceInSite} onChange={(e) => setDeviceInSite(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]">
-                      <option value="ODP">ODP — Optical Distribution Point</option>
-                      <option value="OTB">OTB — Optical Terminal Box</option>
+                      <option value="ODP">ODP</option>
+                      <option value="OTB">OTB</option>
                       <option value="NONE">NONE</option>
                     </select>
                   </Field>
@@ -388,8 +388,10 @@ export default function BoqMmpPage() {
                   <Field label="Device in Branch" hint="Equipment type at branch locations" required>
                     <select value={deviceInBranch} onChange={(e) => setDeviceInBranch(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]">
-                      <option value="ODP">ODP — Optical Distribution Point</option>
-                      <option value="OTB">OTB — Optical Terminal Box</option>
+                      <option value="ODP">ODP </option>
+                      <option value="OTB">OTB
+                        
+                      </option>
                       <option value="NONE">NONE</option>
                     </select>
                   </Field>
@@ -427,21 +429,20 @@ export default function BoqMmpPage() {
                     </div>
                   )}
 
-                  <div className="col-span-2 flex justify-end mt-2">
-                    <button type="submit" disabled={executing}
-                      className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm">
-                      {executing ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Generating...
-                        </span>
-                      ) : 'Execute'}
-                    </button>
-                  </div>
-
+                </div>
+                <div className="flex justify-end mt-3">
+                  <button type="submit" disabled={executing}
+                    className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm">
+                    {executing ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Generating...
+                      </span>
+                    ) : 'Execute'}
+                  </button>
                 </div>
               </form>
             </div>

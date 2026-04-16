@@ -131,12 +131,12 @@ export default function ImplementationIntersitePage() {
   const { addTask } = useProgress(); // ✅ Ganti (window as any).__progressLogAddTask
 
   const [designFile, setDesignFile] = useState<File | null>(null);
-  const [program, setProgram] = useState('Implementation');
-  const [operator, setOperator] = useState('ioh');
-  const [separator, setSeparator] = useState(';');
-  const [deviceInSite, setDeviceInSite] = useState('OTB');
-  const [deviceInBranch, setDeviceInBranch] = useState('ODP');
-  const [iplRoute, setIplRoute] = useState('existing_fiber');
+  const [program, setProgram] = useState('Type Here');
+  const [operator, setOperator] = useState('');
+  const [separator, setSeparator] = useState('');
+  const [deviceInSite, setDeviceInSite] = useState('');
+  const [deviceInBranch, setDeviceInBranch] = useState('');
+  const [iplRoute, setIplRoute] = useState('');
   const [executing, setExecuting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -297,7 +297,7 @@ export default function ImplementationIntersitePage() {
                     <Field label="Program" hint="Program name for BOQ identification">
                       <input
                         type="text" value={program} onChange={(e) => setProgram(e.target.value)}
-                        placeholder="Implementation"
+                        placeholder="Type Here"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] text-[#11499E]"
                       />
                     </Field>
@@ -326,8 +326,8 @@ export default function ImplementationIntersitePage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]"
                       >
                         <option value="">Select Separator</option>
-                        <option value=";">; (semicolon)</option>
-                        <option value="-">- (dash)</option>
+                        <option value=";">;</option>
+                        <option value="-">-</option>
                       </select>
                     </Field>
 
@@ -348,9 +348,8 @@ export default function ImplementationIntersitePage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]"
                       >
                         <option value="">Select Device</option>
-                        <option value="OTB">OTB — Optical Terminal Box</option>
-                        <option value="ODP">ODP — Optical Distribution Point</option>
-                        <option value="NONE">NONE</option>
+                        <option value="OTB">OTB</option>
+                        <option value="ODP">ODP</option>
                       </select>
                     </Field>
 
@@ -360,9 +359,8 @@ export default function ImplementationIntersitePage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] bg-white text-[#11499E]"
                       >
                         <option value="">Select Device</option>
-                        <option value="ODP">ODP — Optical Distribution Point</option>
-                        <option value="OTB">OTB — Optical Terminal Box</option>
-                        <option value="NONE">NONE</option>
+                        <option value="ODP">ODP</option>
+                        <option value="OTB">OTB</option>
                       </select>
                     </Field>
 
@@ -384,24 +382,22 @@ export default function ImplementationIntersitePage() {
                       </div>
                     )}
 
-                    {/* Execute Button */}
-                    <div className="flex justify-end mt-2">
-                      <button
-                        type="submit" disabled={executing}
-                        className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
-                      >
-                        {executing ? (
-                          <span className="flex items-center gap-2">
-                            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Executing...
-                          </span>
-                        ) : 'Execute'}
-                      </button>
-                    </div>
-
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <button
+                      type="submit" disabled={executing}
+                      className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
+                    >
+                      {executing ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Executing...
+                        </span>
+                      ) : 'Execute'}
+                    </button>
                   </div>
                 </div>
               </form>

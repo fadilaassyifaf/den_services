@@ -484,7 +484,7 @@ export default function InsertRingPage() {
                       <input
                         type="text" inputMode="numeric" pattern="\d*" value={maxMember}
                         onChange={(e) => handleIntegerInput(e.target.value, setMaxMember, setMaxMemberError)}
-                        placeholder="Input Value"
+                        placeholder="Input Value (default :12)"
                         className={`w-full px-3 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] text-[#11499E]
                           ${maxMemberError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                       />
@@ -523,7 +523,7 @@ export default function InsertRingPage() {
                       <input
                         type="text" inputMode="numeric" pattern="\d*" value={maxDistance}
                         onChange={(e) => handleIntegerInput(e.target.value, setMaxDistance, setMaxDistanceError)}
-                        placeholder="Input Value"
+                        placeholder="Input Value (default: 3000m)"
                         className={`w-full px-3 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#11499E] text-[#11499E]
                           ${maxDistanceError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                       />
@@ -567,24 +567,22 @@ export default function InsertRingPage() {
                       </div>
                     )}
 
-                    {/* Execute Button */}
-                    <div className="flex justify-end items-end mt-5">
-                      <button
-                        type="submit" disabled={executing}
-                        className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
-                      >
-                        {executing ? (
-                          <span className="flex items-center gap-2">
-                            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Executing...
-                          </span>
-                        ) : 'Execute'}
-                      </button>
-                    </div>
-
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <button
+                      type="submit" disabled={executing}
+                      className="px-10 h-8 flex items-center justify-center bg-[#11499E] text-white font-semibold rounded-xl hover:bg-[#0d3a7d] transition disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
+                    >
+                      {executing ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Executing...
+                        </span>
+                      ) : 'Execute'}
+                    </button>
                   </div>
                 </div>
               </form>
