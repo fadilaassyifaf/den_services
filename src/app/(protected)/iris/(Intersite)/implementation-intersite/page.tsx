@@ -89,7 +89,7 @@ function ReadMeModal({ onClose }: { onClose: () => void }) {
             <p className="text-xs font-bold text-[#11499E] mb-2 uppercase tracking-wide">Design Template</p>
             <button
               type="button"
-              onClick={() => window.open(`${BACKEND_URL}/template/BOQ_Design_Sample.kmz`, '_blank')}
+              onClick={() => window.open(`${BACKEND_URL}/template/boq/BOQ_Design_Sample.kmz`, '_blank')}
               className="w-full px-4 py-2.5 bg-[#1E99D5] text-white text-sm rounded-xl hover:bg-[#1a88bd] transition font-semibold flex items-center justify-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +131,7 @@ export default function ImplementationIntersitePage() {
   const { addTask } = useProgress(); // ✅ Ganti (window as any).__progressLogAddTask
 
   const [designFile, setDesignFile] = useState<File | null>(null);
-  const [program, setProgram] = useState('Type Here');
+  const [program, setProgram] = useState('');
   const [operator, setOperator] = useState('');
   const [separator, setSeparator] = useState('');
   const [deviceInSite, setDeviceInSite] = useState('');

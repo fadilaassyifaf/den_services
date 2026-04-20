@@ -260,7 +260,7 @@ export abstract class BaseTaskManager {
     taskId: string,
   ): NormalizedTaskStatus {
 
-    const status: TaskStatusState = CELERY_STATUS_MAP[raw.status] ?? 'processing';
+    let status: TaskStatusState = CELERY_STATUS_MAP[raw.status] ?? 'processing';
 
     // ── Progress ────────────────────────────────────────────────────────────
     let progress = 0;
@@ -357,6 +357,29 @@ export abstract class BaseTaskManager {
 
     const downloadUrl = resultObj?.download_url as string | undefined;
     const outputFile  = (resultObj?.output_file || resultObj?.filename) as string | undefined;
+
+    // ── Detect error messages disguised as PROGRESS ──────────────────────────
+    // Some backends return PROGRESS status with error messages in info.status
+    // instead of properly returning FAILURE status.
+    if (status === 'processing' && message) {
+      const lower = message.toLowerCase();
+      const isErrorMsg =
+        lower.includes('missing columns') ||
+        lower.includes('missing required') ||
+        lower.includes('keyerror') ||
+        lower.includes('valueerror') ||
+        lower.includes('typeerror') ||
+        lower.includes('attributeerror') ||
+        lower.includes('exception') ||
+        lower.includes('traceback') ||
+        /\berror\b/.test(lower) ||
+        /\bfailed\b/.test(lower) ||
+        /\bgagal\b/.test(lower);
+
+      if (isErrorMsg) {
+        status = 'failed';
+      }
+    }
 
     // ── Build log entry ──────────────────────────────────────────────────────
     const logs: LogEntry[] = message

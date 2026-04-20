@@ -42,6 +42,7 @@ export default function FTTXDesignPage() {
     { id: 'polygon-intersite', title: 'Polygon Intersite', description: 'Create Intersite design Polygon Based.', icon: <Pentagon className="w-5 h-5 text-emerald-600" /> },
     { id: 'topology-intersite', title: 'Topology Intersite', description: 'Create Intersite design Topology Based.', icon: <Network className="w-5 h-5 text-orange-600" /> },
     { id: 'implementation-intersite', title: 'Implementation Intersite', description: 'Implementation KMZ with BOQ Report.', icon: <MapPin className="w-5 h-5 text-rose-600" /> },
+        { id: 'short-mmp', title: 'Short MMP', description: 'Generate a concise MMP for intersite fiber projects.', icon: <MapPin className="w-5 h-5 text-rose-600" /> },
   ];
 
   const reportDesigns: DesignCard[] = [
@@ -119,22 +120,22 @@ export default function FTTXDesignPage() {
           <div className="max-w-4xl w-full mx-auto px-6 flex flex-col h-full overflow-hidden">
 
             {/* Title Section */}
-            <div className="pt-10 pb-6 flex-shrink-0 flex justify-center">
+            <div className="pt-12 pb-4 flex-shrink-0 flex justify-center">
               <div className="text-center">
-                <h1 className="text-7xl font-bold text-[#11499E] leading-none mb-1 tracking-tighter">
+                <h1 className="text-5xl font-bold text-[#11499E] leading-none mb-1 tracking-tighter">
                   Network Planning
                 </h1>
                 <div className="flex items-baseline gap-2 justify-center">
-                  <span className="text-3xl font-medium text-[#11499E]">design</span>
-                  <span className="text-5xl font-bold text-[#11499E]">Engineering</span>
-                  <span className="text-5xl font-bold text-[#1E99D5]">API</span>
-                  <span className="text-5xl font-bold text-[#11499E]">services</span>
+                  <span className="text-2xl font-medium text-[#11499E]">design</span>
+                  <span className="text-4xl font-bold text-[#11499E]">Engineering</span>
+                  <span className="text-4xl font-bold text-[#1E99D5]">API</span>
+                  <span className="text-4xl font-bold text-[#11499E]">services</span>
                 </div>
               </div>
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex justify-center mb-6 flex-shrink-0">
+            <div className="flex justify-center mb-4 flex-shrink-0">
               <div className="flex bg-gray-50 p-1 rounded-full border border-gray-200">
                 {tabs.map((tab) => (
                   <button
@@ -154,24 +155,24 @@ export default function FTTXDesignPage() {
 
             {/* Cards Grid */}
             <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hide">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-10">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pb-6">
                 {getActiveDesigns().map((design) => (
                   <button
                     key={design.id}
                     onClick={() => handleCardClick(design)}
-                    className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col items-center text-center hover:border-[#11499E] hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 group relative overflow-hidden h-[180px] justify-center"
+                    className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center text-center hover:border-[#11499E] hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 group relative overflow-hidden h-[130px] justify-center"
                   >
-                    <div className="mb-3 p-3 bg-gray-50 rounded-xl group-hover:bg-blue-50 transition-colors duration-300">
+                    <div className="mb-2 p-2 bg-gray-50 rounded-xl group-hover:bg-blue-50 transition-colors duration-300">
                       {design.icon}
                     </div>
-                    
-                    <h3 className="text-sm font-bold text-gray-800 mb-2 leading-tight group-hover:text-[#11499E] transition-colors">
+
+                    <h3 className="text-xs font-bold text-gray-800 mb-1 leading-tight group-hover:text-[#11499E] transition-colors">
                       {design.title}
                     </h3>
-                    <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 px-2">
+                    <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-2 px-2">
                       {design.description}
                     </p>
-                    
+
                     <div className="absolute bottom-0 left-0 w-full h-1 bg-[#11499E] transform translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                   </button>
                 ))}

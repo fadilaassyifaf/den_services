@@ -186,7 +186,7 @@ export default function ProgressLog({ userNik, onTasksChange }: ProgressLogProps
         return (
           <div
             key={task.task_id}
-            className={`border rounded-xl overflow-hidden transition-all duration-200 shadow-sm ${cfg.card} ${cfg.accent}`}
+            className={`border rounded-xl overflow-hidden transition-all duration-200 shadow-sm ${cfg.card}`}
           >
             {/* Header */}
             <div className="px-3 pt-3 pb-2 flex items-start gap-2.5">

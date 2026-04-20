@@ -60,7 +60,7 @@ export default function HomePage() {
     {
       title: 'Network Monitoring',
       description: 'Real-time capacity, availability, and operational status.',
-      onClick: () => router.push('http://localhost:3002'),
+      onClick: () => router.push('http://localhost:3003'),
     },
     {
       title: 'Network Planning',
